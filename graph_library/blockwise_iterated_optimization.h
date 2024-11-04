@@ -2,6 +2,9 @@
 #include <cmath>
 #include <algorithm>
 
+const int MAX_LOCAL_SEARCH_ITERS = 100;  // Limit for local search iterations
+const int MAX_BLOCK_ORDER_ITERS = 1000;    // Limit for block order optimization iterations
+
 // Helper function to divide edges into blocks of size sqrt(n)
 vector<vector<Edge>> divide_into_blocks(const vector<Edge>& edges, int block_size) {
     vector<vector<Edge>> blocks;
@@ -55,7 +58,8 @@ vector<Edge> LocalSearch(Graph *graph, const vector<Edge> &block) {
     double current_cost = block_cost(graph, current_block);
     
     bool improved = true;
-    while (improved) {
+    int iterations = 0;
+    while (improved && iterations < MAX_LOCAL_SEARCH_ITERS) {
         improved = false;
         
         for (int i = 0; i < current_block.size() - 1; ++i) {
@@ -71,6 +75,7 @@ vector<Edge> LocalSearch(Graph *graph, const vector<Edge> &block) {
                 swap(current_block[i], current_block[i + 1]);
             }
         }
+        iterations++;
     }
     return current_block;
 }
@@ -141,20 +146,41 @@ pair<vector<Edge>, double> Blockwise_Iterated_Optimization(Graph *graph) {
         block_order[i] = i;
     }
     double best_permutation_cost = best_cost;
+    int iteration = 0;
 
-    // Simple heuristic: permute blocks to find the best order
-    do {
-        vector<Edge> permuted_edges;
-        for (int idx : block_order) {
-            permuted_edges.insert(permuted_edges.end(), blocks[idx].begin(), blocks[idx].end());
+    while (iteration < MAX_BLOCK_ORDER_ITERS) {
+        bool improved = false;
+
+        // Try swapping each adjacent pair in the block order
+        for (int i = 0; i < block_order.size() - 1; ++i) {
+            // Swap adjacent blocks
+            std::swap(block_order[i], block_order[i + 1]);
+
+            // Construct the permuted edge list based on the new block order
+            vector<Edge> permuted_edges;
+            for (int idx : block_order) {
+                permuted_edges.insert(permuted_edges.end(), blocks[idx].begin(), blocks[idx].end());
+            }
+
+            // Calculate the cost for the current permutation
+            double current_cost = calculate_cost(graph, permuted_edges);
+
+            if (current_cost < best_permutation_cost) {
+                // Update the best permutation cost and solution
+                best_permutation_cost = current_cost;
+                sigma_star = permuted_edges;
+                improved = true;
+            } else {
+                // Undo the swap if no improvement
+                std::swap(block_order[i], block_order[i + 1]);
+            }
         }
-        
-        double current_cost = calculate_cost(graph, permuted_edges); // Assume calculate_cost() computes the cost of a solution
-        if (current_cost < best_permutation_cost) {
-            best_permutation_cost = current_cost;
-            sigma_star = permuted_edges;
-        }
-    } while (std::next_permutation(block_order.begin(), block_order.end()));
+
+        // Stop if no further improvements are found
+        if (!improved) break;
+
+        ++iteration;
+    }
 
     return make_pair(sigma_star, best_permutation_cost);
 }
