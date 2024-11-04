@@ -11,7 +11,10 @@
 #include <chrono>
 
 #include "../graph_library/Graph.h"
-#include "../graph_library/blockwise_iterated_optimization.h"
+// #include "../graph_library/blockwise_iterated_optimization.h"
+// #include "../graph_library/ant_colony_optimization_multithreads.h"
+#include "../graph_library/meta_heuristics.h"
+
 
 using namespace std;
 using namespace std::chrono;
@@ -46,6 +49,10 @@ pair<double, double> run_heuristic(Graph* graph, const string& heuristic_name,
     return {cost, ms_duration.count()};
 }
 
+pair< vector<Edge>, double> Ant_Colony_Optimization_MultiThreads_(Graph* graph) {
+    return Iterated_Local_Search(graph);
+}
+
 int main(int argc, char** argv) {
     if (argc < 2) {
         cerr << "Please specify a folder containing graph files." << endl;
@@ -56,7 +63,7 @@ int main(int argc, char** argv) {
     string folder_path = argv[1];
 
     // Output CSV file
-    ofstream csv_file("heuristic_results.csv");
+    ofstream csv_file("ils_heuristic_results.csv");
     csv_file << "Name,Number of nodes,Number of edges,Number of deliver edges,Cost,Time (ms),Time (s)" << endl;
 
     // Loop through all files in the folder
@@ -79,7 +86,7 @@ int main(int argc, char** argv) {
 
             // Run the heuristic function and capture cost and time
             double cost, ms_time;
-            tie(cost, ms_time) = run_heuristic(graph, "Blockwise Iterated Optimization", Blockwise_Iterated_Optimization);
+            tie(cost, ms_time) = run_heuristic(graph, "Iterated_Local_Search", Ant_Colony_Optimization_MultiThreads_);
             double sec_time = ms_time / 1000.0;
 
             // Write results to CSV
