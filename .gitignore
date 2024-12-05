@@ -1,0 +1,7 @@
+large_data/*
+ea_test/*
+feasible_data/*
+large*/*
+experiments/*.exe
+experiments/*.csv
+data_generation/*.exe

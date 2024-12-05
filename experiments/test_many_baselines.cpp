@@ -11,9 +11,9 @@
 #include <chrono>
 
 #include "../graph_library/Graph.h"
-// #include "../graph_library/blockwise_iterated_optimization.h"
+#include "../graph_library/blockwise_iterated_optimization.h"
 // #include "../graph_library/ant_colony_optimization_multithreads.h"
-#include "../graph_library/meta_heuristics.h"
+// #include "../graph_library/meta_heuristics.h"
 
 
 using namespace std;
@@ -32,7 +32,7 @@ pair<double, double> run_heuristic(Graph* graph, const string& heuristic_name,
     pair<vector<Edge>, double> result = heuristic_func(graph);
     const vector<Edge> sigma = result.first;
     const double cost = result.second;
-
+    
     // Run dynamic programming to verify the cost
     pair<vector<vector<double>>, vector<int>> dp = dynamic_programming(graph, sigma);
     assert(abs(cost - dp.first[0][0]) < 1e-6);
@@ -49,8 +49,8 @@ pair<double, double> run_heuristic(Graph* graph, const string& heuristic_name,
     return {cost, ms_duration.count()};
 }
 
-pair< vector<Edge>, double> Ant_Colony_Optimization_MultiThreads_(Graph* graph) {
-    return Iterated_Local_Search(graph);
+pair< vector<Edge>, double> Optimization_MultiThreads_(Graph* graph) {
+    return Variable_Neighborhood_Search(graph);
 }
 
 int main(int argc, char** argv) {
@@ -63,7 +63,7 @@ int main(int argc, char** argv) {
     string folder_path = argv[1];
 
     // Output CSV file
-    ofstream csv_file("ils_heuristic_results.csv");
+    ofstream csv_file("Blockwise_Iterated_2opt_Exchange_Optimization.csv");
     csv_file << "Name,Number of nodes,Number of edges,Number of deliver edges,Cost,Time (ms),Time (s)" << endl;
 
     // Loop through all files in the folder
@@ -82,11 +82,13 @@ int main(int argc, char** argv) {
             int num_edges = graph->num_edges;
             int num_deliver_edges = graph->num_deliver_edges;
 
+            cout << "Start running Floyd" << endl;
             graph->Floyd_algorithm();
+            cout << "Complete running Floyd" << endl;
 
             // Run the heuristic function and capture cost and time
             double cost, ms_time;
-            tie(cost, ms_time) = run_heuristic(graph, "Iterated_Local_Search", Ant_Colony_Optimization_MultiThreads_);
+            tie(cost, ms_time) = run_heuristic(graph, "Blockwise_Iterated_2opt_Exchange_Optimization", Optimization_MultiThreads_);
             double sec_time = ms_time / 1000.0;
 
             // Write results to CSV

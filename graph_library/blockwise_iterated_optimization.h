@@ -1,6 +1,8 @@
 #include "meta_heuristics.h"
 #include <cmath>
 #include <algorithm>
+#include <random>
+#include <set>
 
 const int MAX_LOCAL_SEARCH_ITERS = 100;  // Limit for local search iterations
 const int MAX_BLOCK_ORDER_ITERS = 1000;    // Limit for block order optimization iterations
@@ -15,172 +17,277 @@ vector<vector<Edge>> divide_into_blocks(const vector<Edge>& edges, int block_siz
     return blocks;
 }
 
-double calculate_cost(Graph *graph, const vector<Edge> sequence) {
+vector<vector<Edge>> divide_into_blocks_odd(const vector<Edge>& edges, int block_size) {
+    vector<vector<Edge>> blocks;
+
+    if (edges.empty() || block_size <= 0) {
+        return blocks; // Handle edge cases: empty input or invalid block size
+    }
+
+    // Calculate the size of the first block
+    int first_block_size = std::max(1, block_size / 2); // Ensure at least one edge in the first block
+    int remaining_size = edges.size();
+
+    // Create the first block
+    blocks.push_back(vector<Edge>(edges.begin(), edges.begin() + std::min(first_block_size, remaining_size)));
+    remaining_size -= first_block_size;
+
+    // Create the subsequent blocks of size block_size
+    for (int i = first_block_size; i < edges.size(); i += block_size) {
+        vector<Edge> block(edges.begin() + i, edges.begin() + std::min(i + block_size, (int)edges.size()));
+        blocks.push_back(block);
+    }
+
+    return blocks;
+}
+
+
+vector<Edge> concatenate_blocks(const vector<vector<Edge> > blocks) {
+    vector<Edge> ret;
+    for (auto block : blocks) {
+        ret.insert(ret.end(), block.begin(), block.end());
+    }
+    return ret;
+}
+
+double calculate_cost(Graph *graph, const vector<Edge> &sequence) {
     return dynamic_programming(graph, sequence).first[0][0];
 }
 
-double block_cost(Graph *graph, const vector<Edge> &sequence) {
-    // A heuristics cost function to guide the local search on each block
-	// Check if the graph has computed Floyd's algorithm before
-    assert(graph -> shortest_path.size() == graph -> num_nodes);
-	const double W = graph -> W;
+double calculate_cost(Graph *graph, const vector<vector<Edge> > &blocks) {
+    return calculate_cost(graph, concatenate_blocks(blocks));
+}
 
-	// Number of edges in this list
-	const int m = sequence.size();
 
-	// Initialize
-    vector< vector<double> > f(m, vector<double>(2, INF));
+pair<vector<Edge>, double> Random_Tour(Graph *graph) {
+    auto edges = graph->edges;
+    // Create a random number generator
+    std::random_device rd;  // Seed for the random number generator
+    std::mt19937 g(rd());   // Mersenne Twister engine initialized with rd
 
-	// Compute the Q
-	vector<double> Q(m, 0);
-	Q[m - 1] = sequence[m - 1].q;
-	for (int k = m - 2; k >= 0; --k) {
-		Q[k] = Q[k + 1] + sequence[k].q;
+    // Shuffle the vector
+    std::shuffle(edges.begin(), edges.end(), g);
+    auto cost = dynamic_programming(graph, edges).first[0][0];
+    return {edges, cost};
+}
+
+pair< vector<Edge>, double> Greedy_Sorting_Heuristic(Graph *graph) {
+	// Information
+	const int num_nodes = graph -> num_nodes;
+	const int m = graph -> num_deliver_edges;
+		
+	vector<Edge> edges;
+	edges.clear();
+	for (int k = 0; k < m; ++k) {
+		edges.push_back(Edge(graph -> deliver_edges[k]));
 	}
 
-    f[m - 1][0] = f[m - 1][1] = (Q[m - 1] / 2 + W) * sequence.back().d;
-
-    for(int k = m - 2; k >= 0; k--) {
-        int u = sequence[k].first, v = sequence[k].second;
-        double q = sequence[k].q, d = sequence[k].d;
-        int prev_u = sequence[k + 1].first, prev_v = sequence[k + 1].second;
-        f[k][0] = (W + Q[k] - q / 2) * d + std::min((W + Q[k] - q) * graph->shortest_path[v][prev_u] + f[k + 1][0], 
-                                                (W + Q[k] - q) * graph->shortest_path[v][prev_v] + f[k + 1][1]);
-        f[k][1] = (W + Q[k] - q / 2) * d + std::min((W + Q[k] - q) * graph->shortest_path[u][prev_u] + f[k + 1][0], 
-                                                (W + Q[k] - q) * graph->shortest_path[u][prev_v] + f[k + 1][1]);                       
-    }
-
-	return std::min(f[0][0], f[0][1]);
+	// Sort the list of edges
+	sort(edges.begin(), edges.end());
+    double cost = dynamic_programming(graph, edges).first[0][0];
+    return {edges, cost};
 }
 
-vector<Edge> LocalSearch(Graph *graph, const vector<Edge> &block) {
-    vector<Edge> current_block = block;
-    double current_cost = block_cost(graph, current_block);
-    
-    bool improved = true;
-    int iterations = 0;
-    while (improved && iterations < MAX_LOCAL_SEARCH_ITERS) {
-        improved = false;
-        
-        for (int i = 0; i < current_block.size() - 1; ++i) {
-            // Swap adjacent edges to explore neighborhood
-            swap(current_block[i], current_block[i + 1]);
-            double new_cost = block_cost(graph, current_block);
-            
-            if (new_cost < current_cost) {
-                current_cost = new_cost;
-                improved = true;
-            } else {
-                // Undo the swap if no improvement
-                swap(current_block[i], current_block[i + 1]);
+vector<Edge> Block_2_OPT(Graph *graph, const vector<vector<Edge> > &blocks, int index) {
+    auto block = blocks[index];
+    auto lblocks = blocks;
+    int m = block.size();
+
+    auto best_block = block;
+    double best_cost = calculate_cost(graph, blocks);
+
+    for (int i = 0; i < m; i++) {
+        for (int j=i + 1; j < m; j++) {
+            swap(block[i], block[j]);
+            lblocks[index] = block;
+            auto new_cost = calculate_cost(graph, lblocks);
+            if (new_cost < best_cost) {
+                best_cost = new_cost;
+                best_block = block;
+            }
+            swap(block[i], block[j]);
+        }
+        block = best_block;
+    }
+    return block;
+}
+
+vector<Edge> Optimize_Block(Graph *graph, const vector<vector<Edge> > &blocks, int index) {
+    assert(index >= 0 && index < blocks.size());
+    return Block_2_OPT(graph, blocks, index);
+}
+
+pair< vector<Edge>, double> Method_2_EXCHANGE_BLOCK(Graph *graph, const vector<Edge> sigma) {
+    double best = calculate_cost(graph, sigma);
+    vector<Edge> result = sigma;
+
+    int best_i = -1, best_j = -1;
+
+    // Search
+    for (int i = 0; i < sigma.size(); ++i) {
+        for (int j = i + 1; j < sigma.size(); ++j) {
+            // Reverse the order of edges from i-th to j-th
+            vector<Edge> sequence;
+            sequence.clear();
+            for (int k = 0; k < i; ++k) {
+                sequence.push_back(Edge(sigma[k]));
+            }
+            for (int k = j; k >= i; --k) {
+                sequence.push_back(Edge(sigma[k]));
+            }
+            for (int k = j + 1; k < sigma.size(); ++k) {
+                sequence.push_back(Edge(sigma[k]));
+            }
+            assert(sequence.size() == sigma.size());
+
+            // Dynamic programming
+            pair< vector< vector<double> >, vector<int> > dp = dynamic_programming(graph, sequence);
+
+            const double cost = dp.first[0][0];
+            if (cost < best) {
+                best = cost;
+                result = sequence;
+                best_i = i;
+                best_j = j;
             }
         }
-        iterations++;
     }
-    return current_block;
+    cout << "best i is " << best_i << ", best_j is " << best_j << ", distance is " << best_j - best_i << " blockj size is " << sqrt(sigma.size()) << endl;
+    return make_pair(result, best);
 }
 
-vector<Edge> Perturbation(const vector<Edge> &block) {
-    vector<Edge> perturbed_block = block;
-    int size = perturbed_block.size();
-    
-    if (size > 2) {
-        // Randomly select two edges to swap as a simple perturbation
-        int idx1 = rand() % size;
-        int idx2 = (idx1 + 1 + rand() % (size - 1)) % size;
-        swap(perturbed_block[idx1], perturbed_block[idx2]);
-    }
-    return perturbed_block;
-}
-
-vector<Edge> Blockwise_ILS(Graph *graph, const vector<Edge> &block, const int max_iterations = 10) {
-    vector<Edge> best_block = LocalSearch(graph, block);
-    double best_cost = block_cost(graph, best_block);
-    
-    for (int iter = 0; iter < max_iterations; ++iter) {
-        // Apply perturbation
-        vector<Edge> perturbed_block = Perturbation(best_block);
-        
-        // Local search on the perturbed solution
-        vector<Edge> optimized_block = LocalSearch(graph, perturbed_block);
-        double optimized_cost = block_cost(graph, optimized_block);
-        
-        // Check if we have found a new best solution
-        if (optimized_cost < best_cost) {
-            best_block = optimized_block;
-            best_cost = optimized_cost;
-        }
-    }
-    
-    return best_block;
-}
-
-vector<Edge> Optimize_Block(Graph *graph, const vector<Edge> &block) {
-    return Blockwise_ILS(graph, block);
-}
 
 // Block-based optimization function
-pair<vector<Edge>, double> Blockwise_Iterated_Optimization(Graph *graph) {
-    // Step 1: Create initial solution using a greedy heuristic
-    pair<vector<Edge>, double> greedy = Greedy_Constructive_Heuristic(graph);
+pair<vector<Edge>, double> Blockwise_Iterated_Optimization_2(Graph *graph, int block_size=-1, std::string init_heuristics = "GCH", int max_iterations = 10) {
+    // Step 1: Create initial solution
+    pair<vector<Edge>, double> greedy;
+    if (init_heuristics == "GCH") {
+        greedy = Greedy_Constructive_Heuristic(graph);
+    }
+    else if (init_heuristics == "GSH") {
+        greedy = Greedy_Sorting_Heuristic(graph);
+    }
+    else if (init_heuristics == "RND") {
+        greedy = Random_Tour(graph);
+    }
     vector<Edge> sigma_star = greedy.first;
     double best_cost = greedy.second;
     
-    int n = sigma_star.size();
-    int block_size = std::sqrt(n);
+    if (block_size == -1) {
+        int n = sigma_star.size();
+        block_size = sqrt(n);
+    }
 
-    // Step 2: Divide edges into blocks of size sqrt(n)
-    vector<vector<Edge>> blocks = divide_into_blocks(sigma_star, block_size);
+    vector<vector<Edge>> blocks;
+    vector<Edge> sigma_temp = sigma_star;
 
     // Step 3: Optimize each block independently
-    for (auto &block : blocks) {
-        block = Optimize_Block(graph, block); // Using 1-OPT as an example
+    for (int iter = 0; iter < max_iterations; iter++) {
+        cout << "Iteration " << iter << ": " << endl;
+        cout << "Initial cost is " << calculate_cost(graph, sigma_star) << endl;
+        sigma_temp = Method_2_EXCHANGE_BLOCK(graph, sigma_star).first;
+        cout << "Initial cost after Method_2_EXCHANGE_BLOCK is " << calculate_cost(graph, sigma_temp) << endl;
+        blocks = divide_into_blocks(sigma_temp, block_size);
+        for (size_t i = 0; i < blocks.size(); ++i) {
+            blocks[i] = Optimize_Block(graph, blocks, i);
+        }
+        sigma_temp = concatenate_blocks(blocks);
+        auto new_cost = calculate_cost(graph, sigma_temp);
+        cout << "The new cost is " << new_cost << endl;
+        if (new_cost < best_cost) {
+            cout << "improved at k = " << iter << endl;
+            best_cost = new_cost;
+            sigma_star = sigma_temp;
+        }
     }
 
-    // Step 4: Combine blocks and optimize the permutation of blocks
-    // Flatten the optimized blocks
+    return make_pair(sigma_star, best_cost);
+}
 
-    // Try to find a better block permutation to minimize cost
-    vector<int> block_order(blocks.size());
-    for(int i = 0; i < blocks.size(); i++) { // Initialize with 0, 1, ..., block_count - 1
-        block_order[i] = i;
-    }
-    double best_permutation_cost = best_cost;
-    int iteration = 0;
+pair< vector<Edge>, double> Method_2_EXCHANGE_BLOCK_3(Graph *graph, const vector<Edge> sigma) {
+    double best = calculate_cost(graph, sigma);
+    vector<Edge> result = sigma;
 
-    while (iteration < MAX_BLOCK_ORDER_ITERS) {
-        bool improved = false;
+    int block_size = sqrt(sigma.size());
 
-        // Try swapping each adjacent pair in the block order
-        for (int i = 0; i < block_order.size() - 1; ++i) {
-            // Swap adjacent blocks
-            std::swap(block_order[i], block_order[i + 1]);
+    int best_i = -1, best_j = -1;
 
-            // Construct the permuted edge list based on the new block order
-            vector<Edge> permuted_edges;
-            for (int idx : block_order) {
-                permuted_edges.insert(permuted_edges.end(), blocks[idx].begin(), blocks[idx].end());
+    // Search
+    for (int i = rand() % block_size; i < sigma.size(); i+=block_size) {
+        for (int j = i + block_size; j < sigma.size(); j+=block_size) {
+            // Reverse the order of edges from i-th to j-th
+            vector<Edge> sequence;
+            sequence.clear();
+            for (int k = 0; k < i; ++k) {
+                sequence.push_back(Edge(sigma[k]));
             }
+            for (int k = j; k >= i; --k) {
+                sequence.push_back(Edge(sigma[k]));
+            }
+            for (int k = j + 1; k < sigma.size(); ++k) {
+                sequence.push_back(Edge(sigma[k]));
+            }
+            assert(sequence.size() == sigma.size());
 
-            // Calculate the cost for the current permutation
-            double current_cost = calculate_cost(graph, permuted_edges);
+            // Dynamic programming
+            pair< vector< vector<double> >, vector<int> > dp = dynamic_programming(graph, sequence);
 
-            if (current_cost < best_permutation_cost) {
-                // Update the best permutation cost and solution
-                best_permutation_cost = current_cost;
-                sigma_star = permuted_edges;
-                improved = true;
-            } else {
-                // Undo the swap if no improvement
-                std::swap(block_order[i], block_order[i + 1]);
+            const double cost = dp.first[0][0];
+            if (cost < best) {
+                best = cost;
+                result = sequence;
+                best_i = i;
+                best_j = j;
             }
         }
+    }
+    cout << "best i is " << best_i << ", best_j is " << best_j << ", distance is " << best_j - best_i << " blockj size is " << sqrt(sigma.size()) << endl;
+    return make_pair(result, best);
+}
 
-        // Stop if no further improvements are found
-        if (!improved) break;
-
-        ++iteration;
+// Block-based optimization function
+pair<vector<Edge>, double> Blockwise_Iterated_Optimization_3(Graph *graph, int block_size=-1, std::string init_heuristics = "GCH", int max_iterations = 50) {
+    // Step 1: Create initial solution
+    pair<vector<Edge>, double> greedy;
+    if (init_heuristics == "GCH") {
+        greedy = Greedy_Constructive_Heuristic(graph);
+    }
+    else if (init_heuristics == "GSH") {
+        greedy = Greedy_Sorting_Heuristic(graph);
+    }
+    else if (init_heuristics == "RND") {
+        greedy = Random_Tour(graph);
+    }
+    vector<Edge> sigma_star = greedy.first;
+    double best_cost = greedy.second;
+    
+    if (block_size == -1) {
+        int n = sigma_star.size();
+        block_size = sqrt(n);
     }
 
-    return make_pair(sigma_star, best_permutation_cost);
+    vector<vector<Edge>> blocks;
+    vector<Edge> sigma_temp = sigma_star;
+
+    // Step 3: Optimize each block independently
+    for (int iter = 0; iter < max_iterations; iter++) {
+        cout << "Iteration " << iter << ": " << endl;
+        cout << "Initial cost is " << calculate_cost(graph, sigma_star) << endl;
+        sigma_temp = sigma_star;
+        cout << "Initial cost after Method_2_EXCHANGE_BLOCK is " << calculate_cost(graph, sigma_temp) << endl;
+        blocks = divide_into_blocks(sigma_temp, block_size);
+        for (size_t i = 0; i < blocks.size(); ++i) {
+            blocks[i] = Optimize_Block(graph, blocks, i);
+        }
+        sigma_temp = concatenate_blocks(blocks);
+        auto new_cost = calculate_cost(graph, sigma_temp);
+        cout << "The new cost is " << new_cost << endl;
+        if (new_cost < best_cost) {
+            cout << "improved at k = " << iter << endl;
+            best_cost = new_cost;
+            sigma_star = sigma_temp;
+        }
+    }
+
+    return make_pair(sigma_star, best_cost);
 }
