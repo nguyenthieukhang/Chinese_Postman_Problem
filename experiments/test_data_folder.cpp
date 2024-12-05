@@ -11,8 +11,8 @@
 #include <chrono>
 
 #include "../graph_library/Graph.h"
-#include "../graph_library/blockwise_iterated_optimization.h"
-// #include "../graph_library/ant_colony_optimization_multithreads.h"
+// #include "../graph_library/blockwise_iterated_optimization.h"
+#include "../graph_library/ant_colony_optimization_multithreads.h"
 // #include "../graph_library/meta_heuristics.h"
 
 
@@ -63,7 +63,7 @@ int main(int argc, char** argv) {
     string folder_path = argv[1];
 
     // Output CSV file
-    ofstream csv_file("Blockwise_Iterated_2opt_Exchange_Optimization.csv");
+    ofstream csv_file("ACO_multithread.csv");
     csv_file << "Name,Number of nodes,Number of edges,Number of deliver edges,Cost,Time (ms),Time (s)" << endl;
 
     // Loop through all files in the folder
@@ -82,13 +82,11 @@ int main(int argc, char** argv) {
             int num_edges = graph->num_edges;
             int num_deliver_edges = graph->num_deliver_edges;
 
-            cout << "Start running Floyd" << endl;
             graph->Floyd_algorithm();
-            cout << "Complete running Floyd" << endl;
 
             // Run the heuristic function and capture cost and time
             double cost, ms_time;
-            tie(cost, ms_time) = run_heuristic(graph, "Blockwise_Iterated_2opt_Exchange_Optimization", Optimization_MultiThreads_);
+            tie(cost, ms_time) = run_heuristic(graph, "ACO_multithread", Optimization_MultiThreads_);
             double sec_time = ms_time / 1000.0;
 
             // Write results to CSV
