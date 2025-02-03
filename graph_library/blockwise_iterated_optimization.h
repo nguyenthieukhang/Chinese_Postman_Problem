@@ -30,7 +30,6 @@ double calculate_cost(Graph *graph, const vector<vector<Edge> > &blocks) {
     return calculate_cost(graph, concatenate_blocks(blocks));
 }
 
-
 pair<vector<Edge>, double> Random_Tour(Graph *graph) {
     auto edges = graph->edges;
     // Create a random number generator
@@ -129,7 +128,7 @@ pair< vector<Edge>, double> Blockwise_2_Exchange(Graph *graph, const vector<Edge
 
 
 // Block-based optimization function
-pair<vector<Edge>, double> Blockwise_Iterated_Optimization_2(Graph *graph, int block_size=-1, std::string init_heuristics = "GCH", int max_iterations = 10) {
+pair<vector<Edge>, double> Blockwise_Iterated_Optimization(Graph *graph, int block_size=-1, std::string init_heuristics = "GCH", int max_iterations = 100) {
     // Step 1: Create initial solution
     pair<vector<Edge>, double> greedy;
     if (init_heuristics == "GCH") {
@@ -154,19 +153,14 @@ pair<vector<Edge>, double> Blockwise_Iterated_Optimization_2(Graph *graph, int b
 
     // Step 3: Optimize each block independently
     for (int iter = 0; iter < max_iterations; iter++) {
-        cout << "Iteration " << iter << ": " << endl;
-        cout << "Initial cost is " << calculate_cost(graph, sigma_star) << endl;
         sigma_temp = Blockwise_2_Exchange(graph, sigma_star).first;
-        cout << "Initial cost after Method_2_EXCHANGE_BLOCK is " << calculate_cost(graph, sigma_temp) << endl;
         blocks = divide_into_blocks(sigma_temp, block_size);
         for (size_t i = 0; i < blocks.size(); ++i) {
             blocks[i] = Optimize_Block(graph, blocks, i);
         }
         sigma_temp = concatenate_blocks(blocks);
         auto new_cost = calculate_cost(graph, sigma_temp);
-        cout << "The new cost is " << new_cost << endl;
         if (new_cost < best_cost) {
-            cout << "improved at k = " << iter << endl;
             best_cost = new_cost;
             sigma_star = sigma_temp;
         }

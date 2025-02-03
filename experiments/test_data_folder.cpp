@@ -11,9 +11,13 @@
 #include <chrono>
 
 #include "../graph_library/Graph.h"
-// #include "../graph_library/blockwise_iterated_optimization.h"
-#include "../graph_library/ant_colony_optimization_multithreads.h"
+#include "../graph_library/blockwise_iterated_optimization.h"
+// #include "../graph_library/block_augmented_ant_colony_optimization.h"
 // #include "../graph_library/meta_heuristics.h"
+// #include "../graph_library/ant_colony_optimization_multithreads.h"
+// #include "../graph_library/block_augmented_variable_neighbourhood_search.h"
+// #include "../graph_library/block_augmented_evolutionary_algorithm.h"
+// #include "../graph_library/evolutionary_algorithm_multithreads.h"
 
 
 using namespace std;
@@ -50,7 +54,7 @@ pair<double, double> run_heuristic(Graph* graph, const string& heuristic_name,
 }
 
 pair< vector<Edge>, double> Optimization_MultiThreads_(Graph* graph) {
-    return Variable_Neighborhood_Search(graph);
+    return Greedy_Constructive_Heuristic(graph);
 }
 
 int main(int argc, char** argv) {
@@ -63,7 +67,7 @@ int main(int argc, char** argv) {
     string folder_path = argv[1];
 
     // Output CSV file
-    ofstream csv_file("ACO_multithread.csv");
+    ofstream csv_file("Greedy_Constructive_Heuristic_sample.csv");
     csv_file << "Name,Number of nodes,Number of edges,Number of deliver edges,Cost,Time (ms),Time (s)" << endl;
 
     // Loop through all files in the folder
@@ -86,7 +90,7 @@ int main(int argc, char** argv) {
 
             // Run the heuristic function and capture cost and time
             double cost, ms_time;
-            tie(cost, ms_time) = run_heuristic(graph, "ACO_multithread", Optimization_MultiThreads_);
+            tie(cost, ms_time) = run_heuristic(graph, "Blockwise_Iterated_Optimization", Optimization_MultiThreads_);
             double sec_time = ms_time / 1000.0;
 
             // Write results to CSV
@@ -98,7 +102,7 @@ int main(int argc, char** argv) {
     }
 
     csv_file.close();
-    cout << "Results saved to heuristic_results.csv" << endl;
+    cout << "Results saved to Greedy_Constructive_Heuristic_sample=100.csv" << endl;
 
     return 0;
 }
