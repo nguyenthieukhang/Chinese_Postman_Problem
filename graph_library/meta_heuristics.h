@@ -14,11 +14,19 @@
 #include <algorithm>
 #include <assert.h>
 #include <thread>
+#include <map>
+#include <set>
 
 #include "../graph_library/Graph.h"
 
 using namespace std;
 
+void my_assert(bool condition, const std::string& message) {
+    if (!condition) {
+        std::cout << "Assertion failed: " << message << std::endl;
+        exit(-1);
+    }
+}
 
 // +--------------------------------+
 // | Greedy Constructive Heuristics |
@@ -606,3 +614,179 @@ pair< vector<Edge>, double> Variable_Neighborhood_Search(Graph *graph, const int
     return make_pair(sigma_star, best);
 }
 
+std::vector<Edge> get_path_edges(Graph* graph, int u, int v) {
+	const auto vertices = graph->dijkstra_path[u][v];
+	int cur = u;
+	std::vector<Edge> edges;
+	for (int i = 1; i < (int) vertices.size(); i++) {
+		auto vertex = vertices[i];
+		auto edge = graph->get_edge(cur, vertex);
+		if (edge.first == -1) {edge = graph->get_edge(vertex, cur);}
+		edges.push_back(edge);
+		cur = vertex;
+		my_assert(edges.back().first != -1, "This is wrong!");
+	}
+	return edges;
+}
+
+// Return the optimal edge direction and corresponding cost by using dynamic programming
+std::pair<std::vector<int>, double> cost_tour(Graph* network, std::vector<Edge> edges) {
+	auto dp = dynamic_programming(network, edges);
+	return {dp.second, dp.first[0][0]};
+}
+
+// Greedy Constructive Heuristics Implementation
+pair< vector<Edge>, double> new_greedy_constructive_heuristics(Graph* network) {
+   // Lambda comparator for edges
+    auto edge_comparator = [](const Edge& a, const Edge& b) {
+        double productA = a.d * a.q;
+        double productB = b.d * b.q;
+        return productA > productB; // Larger products come first
+    };
+
+    // Multiset of edges with custom comparator
+    std::multiset<Edge, decltype(edge_comparator)> edge_pool(edge_comparator);
+	for (const auto& edge : network->deliver_edges) {
+		edge_pool.insert(edge);
+	}
+
+    // Construct solution iteratively
+    std::vector<Edge> constructed_solution;
+
+    while (!edge_pool.empty()) {
+        // Extract and remove the best edge from the pool
+        Edge current_edge = *edge_pool.begin();
+        edge_pool.erase(edge_pool.begin());
+
+        // Apply the simple shift operator		
+		auto min_cost = std::numeric_limits<double>::infinity();
+		std::vector<Edge> best_solution = constructed_solution;
+		int n = constructed_solution.size();
+		int k_prime = -1;
+
+		for (int i = 0; i <= n ; i++) {
+			constructed_solution.insert(constructed_solution.begin() + i, current_edge);
+			auto cost = cost_tour(network, constructed_solution).second;
+			if (cost < min_cost) {
+				min_cost = cost;
+				best_solution = constructed_solution;
+				k_prime = i;
+			}
+			constructed_solution.erase(constructed_solution.begin() + i);
+		}
+    	constructed_solution = best_solution;
+        my_assert(k_prime >= 0, "k_prime must be >= 0");
+
+		auto theres_more = k_prime != (int) constructed_solution.size() - 1;
+
+    	// Update the path from k_prime - 1 to k_prime
+		auto temp_direction = cost_tour(network, constructed_solution).first;
+    	auto u = network->start_node;
+    	if (k_prime != 0) {
+    		my_assert(k_prime > 0, "k_prime must be > 0");
+    		u = temp_direction[k_prime - 1]
+					   ? constructed_solution[k_prime - 1].first
+					   : constructed_solution[k_prime - 1].second;
+    	}
+        auto v = temp_direction[k_prime]
+                   ? constructed_solution[k_prime].second
+                   : constructed_solution[k_prime].first;
+
+        int insert_position = k_prime;
+		auto path = get_path_edges(network, u, v);
+        for (const auto& edge : path) {
+	        auto it = edge_pool.end();
+        	for (it = edge_pool.begin(); it != edge_pool.end(); ++it) {
+        		if ((*it) == edge) {break;}
+        	}
+            if (it != edge_pool.end()) {
+                constructed_solution.insert(constructed_solution.begin() + insert_position, *it);
+                edge_pool.erase(it);
+                insert_position++;
+            }
+        	else {
+        		int index = -1;
+        		for (int i = insert_position + 1; i < (int) constructed_solution.size(); i++) {
+					if (constructed_solution[i] == edge) {index = i; break;}
+        		}
+        		if (index == -1) {continue;}
+        		constructed_solution.erase(constructed_solution.begin() + index);
+				constructed_solution.insert(constructed_solution.begin() + insert_position, edge);
+        		insert_position++;
+        	}
+        }
+
+    	if (theres_more) {
+			// Update the tour from the shortest path between k_prime and k_prime + 1
+    		u = temp_direction[k_prime]
+					   ? constructed_solution[insert_position].first
+					   : constructed_solution[insert_position].second;
+    		v = temp_direction[k_prime + 1]
+				   ? constructed_solution[insert_position + 1].second
+				   : constructed_solution[insert_position + 1].first;
+    		my_assert(current_edge == constructed_solution[insert_position], "Insert position wrong!");
+    		insert_position = insert_position + 1;
+			path = get_path_edges(network, u, v);
+    		for (const auto& edge : path) {
+    			auto it = edge_pool.end();
+    			for (it = edge_pool.begin(); it != edge_pool.end(); ++it) {
+    				if ((*it) == edge) {break;}
+    			}
+    			if (it != edge_pool.end()) {
+    				constructed_solution.insert(constructed_solution.begin() + insert_position, *it);
+    				edge_pool.erase(it);
+    				insert_position++;
+    			}
+    			else {
+    				int index = -1;
+    				for (int i = insert_position + 1; i < (int) constructed_solution.size(); i++) {
+    					if (constructed_solution[i] == edge) {index = i; break;}
+    				}
+    				if (index == -1) {continue;}
+    				constructed_solution.erase(constructed_solution.begin() + index);
+    				constructed_solution.insert(constructed_solution.begin() + insert_position, edge);
+    				insert_position++;
+    			}
+    		}
+    	}
+    }
+	
+	my_assert(constructed_solution.size() == network->deliver_edges.size(), "They must have the same size");
+
+	// Check if the result contains distinct elements
+	std::set<std::pair<int, int> > s;
+	for (const auto& edge : constructed_solution) {s.insert({edge.first, edge.second});}
+	my_assert(s.size() == network->deliver_edges.size(), "They have the same size");
+
+    // Finalize and return the constructed solution
+    auto direction = cost_tour(network, constructed_solution).first;
+    std::vector<Edge> perm;
+    auto cur = network->start_node;
+
+	auto comp = [](const Edge& a, const Edge& b) { return std::make_pair(a.first, a.second) < std::make_pair(b.first, b.second);};
+
+    std::map<Edge, bool, decltype(comp)> delivery_edges(comp);
+
+    for (int i = 0; i < (int) constructed_solution.size(); i++) {
+        if (delivery_edges.count(constructed_solution[i]) > 0) continue;
+        auto next = direction[i]? constructed_solution[i].second : constructed_solution[i].first;
+		auto path = get_path_edges(network, cur, next);
+        for (auto edge : path) {
+            if (edge.q > 0.0) {
+                // This is a delivery edge
+                if (delivery_edges.count(edge) == 0) {
+                    delivery_edges[edge] = true;
+                    perm.push_back(edge);
+                }
+            }
+        }
+        perm.push_back(constructed_solution[i]);
+        delivery_edges[perm.back()] = true;
+        cur = direction[i]? perm.back().first : perm.back().second;
+        if (perm.size() == constructed_solution.size()) break;
+    }
+
+	auto cost = cost_tour(network, constructed_solution).second;
+
+	return {constructed_solution, cost};
+}

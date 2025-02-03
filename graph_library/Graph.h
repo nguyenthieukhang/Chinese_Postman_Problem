@@ -56,6 +56,10 @@ struct Edge {
 		return false;
 	}
 
+	bool operator == (const Edge& other) const {
+        return (first == other.first && second == other.second) || (first == other.second && second == other.first);
+    }
+
 	int first;
 	int second;
 	double d;

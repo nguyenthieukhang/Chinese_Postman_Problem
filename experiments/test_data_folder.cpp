@@ -48,7 +48,7 @@ pair<double, double> run_heuristic(Graph* graph, const string& heuristic_name,
 }
 
 pair<vector<Edge>, double> Optimize(Graph* graph) {
-    return Greedy_Constructive_Heuristic_2(graph);
+    return new_greedy_constructive_heuristics(graph);
 }
 
 int main(int argc, char** argv) {
@@ -84,7 +84,7 @@ int main(int argc, char** argv) {
             graph->Dijkstra_algorithm();
 
             double cost, ms_time;
-            tie(cost, ms_time) = run_heuristic(graph, "Greedy_Constructive_Heuristic_2", Optimize);
+            tie(cost, ms_time) = run_heuristic(graph, "new_greedy_constructive_heuristics", Optimize);
             double sec_time = ms_time / 1000.0;
 
             csv_file << file_name << "," << num_nodes << "," << num_edges << "," 
