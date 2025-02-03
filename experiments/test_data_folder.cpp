@@ -11,14 +11,7 @@
 #include <chrono>
 
 #include "../graph_library/Graph.h"
-#include "../graph_library/blockwise_iterated_optimization.h"
-// #include "../graph_library/block_augmented_ant_colony_optimization.h"
-// #include "../graph_library/meta_heuristics.h"
-// #include "../graph_library/ant_colony_optimization_multithreads.h"
-// #include "../graph_library/block_augmented_variable_neighbourhood_search.h"
-// #include "../graph_library/block_augmented_evolutionary_algorithm.h"
-// #include "../graph_library/evolutionary_algorithm_multithreads.h"
-
+#include "../graph_library/meta_heuristics.h"
 
 using namespace std;
 using namespace std::chrono;
@@ -34,6 +27,7 @@ pair<double, double> run_heuristic(Graph* graph, const string& heuristic_name,
 
     // Run heuristic
     pair<vector<Edge>, double> result = heuristic_func(graph);
+    std::cout << "Here" << std::endl;
     const vector<Edge> sigma = result.first;
     const double cost = result.second;
     
@@ -53,24 +47,26 @@ pair<double, double> run_heuristic(Graph* graph, const string& heuristic_name,
     return {cost, ms_duration.count()};
 }
 
-pair< vector<Edge>, double> Optimization_MultiThreads_(Graph* graph) {
-    return Greedy_Constructive_Heuristic(graph);
+pair<vector<Edge>, double> Optimize(Graph* graph) {
+    return Greedy_Constructive_Heuristic_2(graph);
 }
 
 int main(int argc, char** argv) {
-    if (argc < 2) {
-        cerr << "Please specify a folder containing graph files." << endl;
+    if (argc < 3) {
+        cerr << "Usage: " << argv[0] << " <graph_folder> <output_file>" << endl;
         return 1;
     }
 
-    // Path to folder containing input graph files
     string folder_path = argv[1];
+    string output_file = argv[2];
 
-    // Output CSV file
-    ofstream csv_file("Greedy_Constructive_Heuristic_sample.csv");
-    csv_file << "Name,Number of nodes,Number of edges,Number of deliver edges,Cost,Time (ms),Time (s)" << endl;
+    // Check if file exists, if not, write the header
+    bool file_exists = fs::exists(output_file);
+    ofstream csv_file(output_file, ios::app);
+    if (!file_exists) {
+        csv_file << "Name,Number of nodes,Number of edges,Number of deliver edges,Cost,Time (ms),Time (s)" << endl;
+    }
 
-    // Loop through all files in the folder
     for (const auto& entry : fs::directory_iterator(folder_path)) {
         if (entry.is_regular_file()) {
             string file_path = entry.path().string();
@@ -78,31 +74,29 @@ int main(int argc, char** argv) {
             
             cout << "Processing file: " << file_name << endl;
 
-            // Load the input graph
             Graph* graph = new Graph(file_path.c_str());
 
-            // Collect graph statistics
             int num_nodes = graph->num_nodes;
             int num_edges = graph->num_edges;
             int num_deliver_edges = graph->num_deliver_edges;
 
             graph->Floyd_algorithm();
+            graph->Dijkstra_algorithm();
 
-            // Run the heuristic function and capture cost and time
             double cost, ms_time;
-            tie(cost, ms_time) = run_heuristic(graph, "Blockwise_Iterated_Optimization", Optimization_MultiThreads_);
+            tie(cost, ms_time) = run_heuristic(graph, "Greedy_Constructive_Heuristic_2", Optimize);
             double sec_time = ms_time / 1000.0;
 
-            // Write results to CSV
             csv_file << file_name << "," << num_nodes << "," << num_edges << "," 
                      << num_deliver_edges << "," << cost << "," << ms_time << "," << sec_time << endl;
 
+            csv_file.flush(); // Ensure data is written immediately
             delete graph;
         }
     }
 
     csv_file.close();
-    cout << "Results saved to Greedy_Constructive_Heuristic_sample=100.csv" << endl;
+    cout << "Results appended to " << output_file << endl;
 
     return 0;
 }
