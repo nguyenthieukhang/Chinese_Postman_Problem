@@ -1,4 +1,4 @@
-// Testing the Variable Neighborhood Search (VNS) for the load-dependent Chinese postman problem
+// Testing the Blockwise Iterated Optimization (BIO) for the load-dependent Chinese postman problem
 // Author: Dr. Truong Son Hy
 // Copyright 2023
 
